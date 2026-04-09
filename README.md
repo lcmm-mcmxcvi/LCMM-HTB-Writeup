@@ -7,6 +7,7 @@ Writeups for completed HackTheBox machines.
 | [CCTV](machines/CCTV/) | Linux | Medium | 2026-03-09 | ✅ Completed |
 | [Pirate](machines/Pirate/) | Windows | Hard | 2026-03-02 | ✅ Completed |
 | [Facts](machines/Facts/) | Linux | Medium | 2026-03-09 | ✅ Completed |
+| [WingData](machines/WingData/) | Linux | Easy | 2026-04-09 | ✅ Completed |
 | [Garfield](machines/Garfield/) | Windows | TBD | 2026-04-08 | 🔄 In Progress |
 
 ## Methodology
