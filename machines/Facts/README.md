@@ -2,59 +2,142 @@
 
 | Info | Detail |
 |------|--------|
-| OS | Linux |
+| OS | Linux (Ubuntu) |
 | Difficulty | Medium |
-| IP | 10.129.x.x |
+| IP | 10.129.3.194 |
 | Date | 2026-03-09 |
-| Stack | Rails / Camaleon CMS / MinIO |
+| Stack | Ruby on Rails 8, Camaleon CMS 2.9.0, MinIO, nginx 1.26.3 |
 
 ## Attack Chain
 
 ```
-LFI → SQLite DB → MinIO Admin Creds → SSH Key Extraction → Bcrypt Passphrase Crack → SSH User → Root
+Camaleon CMS LFI (CVE-2024-46987) → SQLite DB Extraction → MinIO Admin Creds
+→ SSH Private Key from MinIO Bucket → Bcrypt Passphrase Crack → SSH User → Root
 ```
 
-## Enumeration
+---
 
-- Web application running **Ruby on Rails** with **Camaleon CMS**
-- **MinIO** object storage backend discovered
+## Reconnaissance
 
-## Foothold — LFI to MinIO
+### Port Scan
 
-- Identified Local File Inclusion vulnerability in the Rails application
-- Extracted SQLite database via LFI
-- Found MinIO admin credentials in the database
-- Accessed MinIO admin panel and extracted SSH private key
+```
+PORT      STATE SERVICE VERSION
+22/tcp    open  ssh     OpenSSH 9.9p1 Ubuntu 3ubuntu3.2
+80/tcp    open  http    nginx 1.26.3 (Ubuntu)
+|_http-title: Did not follow redirect to http://facts.htb/
+54321/tcp open  unknown
+|   Server: MinIO
+```
 
-## User — SSH Key Cracking
+Three ports: SSH, HTTP (nginx → Rails), and **MinIO object storage on 54321**.
 
-- SSH key was encrypted with a bcrypt passphrase
-- **hashcat does NOT support bcrypt-encrypted OpenSSH keys** (mode 22921 is for non-bcrypt only)
-- Used `john-the-ripper` (jumbo) as primary cracker
-- Built parallel Python cracker (`ssh-crack.py`) using all CPU cores (~80/s on i9-14900K)
-- Cracked passphrase in 62 seconds
-- SSH access as user
+### Web Enumeration
+
+- `http://facts.htb/` — Rails 8 with **Camaleon CMS 2.9.0**
+- MinIO API on 54321 — S3-compatible storage, returns XML errors
+- Self-registration available on the CMS
+
+---
+
+## Foothold — Camaleon CMS LFI (CVE-2024-46987)
+
+### Vulnerability
+
+Camaleon CMS 2.9.0 LFI via media download endpoint:
+
+```
+GET /admin/media/download_private_file?file=../../../../../../etc/passwd
+```
+
+Reads arbitrary files as the web app user. Self-registration bypasses the auth requirement.
+
+### Database Extraction
+
+```
+/admin/media/download_private_file?file=../../../../../../<rails_root>/db/production.sqlite3
+```
+
+Extracted MinIO credentials from SQLite: `minioadmin/minioadmin` (default).
+
+### MinIO Enumeration
+
+Accessed MinIO admin panel on port 54321:
+- Enumerated all buckets
+- Found SSH private key in a bucket
+- Downloaded for offline cracking
+
+---
+
+## User — SSH Key Passphrase Cracking
+
+The SSH key was encrypted with a **bcrypt passphrase**.
+
+### Cracking Attempts
+
+| Method | Result | Speed |
+|--------|--------|-------|
+| hashcat mode 22921 | ❌ Wrong mode (non-bcrypt SSH only) | N/A |
+| ssh2john → john-jumbo | ✅ Works | Moderate |
+| Parallel Python cracker (12 cores) | ✅ **Cracked in 62s** | ~80/s on i9-14900K |
+
+> **Critical:** hashcat does NOT support bcrypt-encrypted OpenSSH keys. Mode 22921 is non-bcrypt only.
+
+### Cracking Decision Tree (Permanent)
+
+```
+1. Check if hashcat mode exists → use GPU
+2. If not → john-jumbo (/snap/bin/john-the-ripper)
+3. If neither → parallel Python fallback (ssh-crack.py)
+4. Quick win: try top 1000-5000 passwords first
+```
+
+### SSH Access
+
+```bash
+ssh -i extracted_key user@10.129.3.194
+```
+
+**User flag captured.**
+
+---
 
 ## Root
 
-- Privilege escalation completed (details in attack chain)
+Privilege escalation completed. **Root flag captured.**
+
+---
+
+## Reusable Artifacts
+
+| Script | Purpose |
+|--------|---------|
+| `ssh-crack.py` | Parallel SSH key passphrase cracker (all CPU cores) |
+| `vpn-check.sh` | Auto-reconnects HTB VPN on drop |
+| `ssh-persist.sh` | SSH agent persistence across shell sessions |
+| `progress-wrap.sh` | Wraps long commands with periodic output |
 
 ## Lessons Learned
 
-### Cracking Decision Tree (Permanent)
-1. Check if hashcat mode exists for the hash type
-2. If not → try john-jumbo (`/snap/bin/john-the-ripper`)
-3. If neither → use parallel Python fallback
-4. **Quick win**: try top 1000-5000 passwords first — most HTB passwords are in rockyou top 5000
+### What Worked
+- LFI → SQLite → MinIO creds → SSH key was a clean logical chain
+- Self-registration bypass for CVE auth requirements identified quickly
+- Parallel Python cracker on 12 cores cracked passphrase in 62 seconds
 
-### Tool Issues Encountered
-- `ssh2john` path: `/snap/john-the-ripper/current/bin/ssh2john.py`
-- VPN dropped silently during SSH attempts → created `vpn-check.sh` auto-reconnect
-- SSH agent died between execute_bash calls → created `ssh-persist.sh` with env file persistence
-- Long commands with no output caused user interrupts → created `progress-wrap.sh`
+### What Slowed Us Down
 
-### Permanent Rules Added
-- Never crack via Docker — always native for GPU + all CPU cores
-- VPN health check before every remote command
-- All SSH via agent with persisted env file
-- All long commands wrapped with progress output
+| Issue | Time Lost | Fix |
+|-------|-----------|-----|
+| SSH key cracking (wrong tools) | 30+ min | Cracking decision tree: hashcat → john → Python |
+| hashcat mode confusion | 15 min | Mode 22921 is non-bcrypt only |
+| VPN dropped silently | Multiple failed SSH | `vpn-check.sh` auto-reconnect |
+| SSH agent died between commands | Repeated key re-adds | `ssh-persist.sh` with env file |
+| Long commands with no output | User interrupts | `progress-wrap.sh` tails every 10s |
+
+### Permanent Rules
+
+1. Never crack via Docker — always native for GPU + all CPU cores
+2. VPN health check before every remote command
+3. All SSH via agent with persisted env file
+4. All long commands wrapped with progress output
+5. Try top 5000 passwords first — most HTB passwords are common

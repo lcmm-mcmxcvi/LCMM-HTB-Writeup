@@ -2,7 +2,7 @@
 
 | Info | Detail |
 |------|--------|
-| OS | Linux |
+| OS | Linux (Ubuntu) |
 | Difficulty | Medium |
 | IP | 10.129.4.2 |
 | Date | 2026-03-09 |
@@ -12,46 +12,101 @@
 ## Attack Chain
 
 ```
-ZoneMinder SQLi → Hash Crack → SSH (mark) → motionEye Internal (port 8765) → HMAC Signature Forge → command_notifications RCE → Root
+ZoneMinder SQLi → Hash Crack → SSH (mark) → motionEye Internal (port 8765)
+→ HMAC Signature Forge → command_notifications RCE → Root
 ```
 
-## Enumeration
+---
 
-- Web application running **ZoneMinder** (CCTV management software)
-- Standard port scan revealed HTTP service
+## Reconnaissance
+
+### Port Scan
+
+```
+PORT   STATE SERVICE VERSION
+22/tcp open  ssh     OpenSSH 9.6p1 Ubuntu 3ubuntu13.14
+80/tcp open  http    Apache httpd 2.4.58
+|_http-title: Did not follow redirect to http://cctv.htb/
+```
+
+Only two ports — SSH and HTTP redirecting to `cctv.htb`.
+
+### Web Enumeration
+
+- ZoneMinder CCTV management platform at `/zm/`
+- API endpoint at `/zm/api/` returns `401 Not Authenticated`
+
+---
 
 ## Foothold — ZoneMinder SQL Injection
 
-- Identified SQL injection vulnerability in ZoneMinder
-- Extracted password hashes from the database
-- Cracked hash to obtain credentials for user `mark`
-- SSH access as `mark` using cracked credentials
+### Vulnerability Discovery
+
+- SQL injection in ZoneMinder's filter/authentication handling
+- Extracted user credentials from the ZoneMinder database via SQLi
+
+### Hash Cracking
+
+- Extracted bcrypt hash for admin user
+- Cracked with GPU hashcat (RTX 5070, mode 3200)
+- Obtained credentials for user `mark`
+
+### Initial Access
+
+```bash
+ssh mark@10.129.4.2
+```
+
+**User flag captured.**
+
+---
 
 ## Privilege Escalation — motionEye RCE
 
 ### Internal Service Discovery
 
-After getting a shell as `mark`, ran `ss -tlnp` and discovered **motionEye** running on internal port **8765** — not accessible externally.
+First commands after shell:
+
+```bash
+ss -tlnp
+ps aux
+```
+
+Discovered **motionEye** on internal port **8765** — not externally accessible. The motion process runs as **root**.
+
+### motionEye Analysis
+
+- Default admin account (empty password)
+- Config hash in `/etc/motioneye/motion.conf`
+- API uses HMAC-SHA1 signature verification for command execution
 
 ### HMAC Signature Forgery
 
-- Read the motionEye application source code to understand the authentication mechanism
-- Discovered the API used HMAC-based signature verification for command execution
-- Forged valid HMAC signatures to authenticate to the internal API
+1. Read motionEye source code to understand the signing mechanism
+2. Identified HMAC key derivation and signing process
+3. Forged valid signatures to authenticate API requests
 
 ### Root via command_notifications
 
-- Exploited the `command_notifications` feature in motionEye
-- Injected commands through the notification handler
-- Achieved RCE as `root`
+motionEye's `command_notifications` feature executes commands on motion events:
 
-## Reusable Scripts Created
+1. Set `command_notifications_exec` → reverse shell via `on_event_start`
+2. Triggered motion event via HTTP control port (7999)
+3. Motion process executed command **as root**
 
-- `post-shell-enum.sh` — Automated post-exploitation enumeration
-- `motioneye-rce.py` — motionEye command_notifications exploit
+**Root flag captured.**
+
+---
+
+## Reusable Artifacts
+
+| Script | Purpose |
+|--------|---------|
+| `post-shell-enum.sh` | Automated post-exploitation enumeration |
+| `motioneye-rce.py` | motionEye command_notifications exploit |
 
 ## Lessons Learned
 
-- `ss -tlnp` + `ps aux` should be the FIRST commands after any shell — internal services are the most common Linux privesc vector
-- When facing custom auth on internal services, read the application source code immediately — don't guess authentication schemes
-- Never embed `sleep` inside SSH sessions — split into separate calls
+1. **`ss -tlnp` + `ps aux` FIRST** — Internal services are the #1 privesc vector on Linux
+2. **Read source code, don't guess auth** — motionEye HMAC-SHA1 was faster to reverse than brute force
+3. **SSH session discipline** — Never embed `sleep` inside SSH sessions, split into separate calls
