@@ -14,6 +14,7 @@ resume or review a box later without relying on memory.
 | [Facts](machines/Facts/) | Linux | Medium | 2026-03-09 | ✅ Completed |
 | [WingData](machines/WingData/) | Linux | Easy | 2026-04-09 | ✅ Completed |
 | [Fireflow](machines/Fireflow/) | Linux | Medium | 2026-08-13 / 2026-08-14 | ✅ Completed |
+| [Connected](machines/Connected/) | Linux | Easy | 2026-08-14 | ✅ Completed |
 | [Garfield](machines/Garfield/) | Windows | TBD | 2026-04-08 | 🔄 In Progress |
 
 ## Current Operator
@@ -48,6 +49,8 @@ Every writeup should aim for this structure:
 7. Privilege escalation path with command evidence.
 8. Root proof/flag handling.
 9. Reusable artifacts, lessons learned, and mitigations.
+10. After a machine is finished, add/update the repository writeup, verify the
+   diff, commit it, and push when repository access is configured.
 
 ## Environment
 
