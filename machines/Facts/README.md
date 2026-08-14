@@ -136,8 +136,10 @@ Privilege escalation completed. **Root flag captured.**
 
 ### Permanent Rules
 
-1. Never crack via Docker — always native for GPU + all CPU cores
-2. VPN health check before every remote command
-3. All SSH via agent with persisted env file
+1. Prefer native cracking when GPU/CPU access matters; avoid container wrappers
+   that hide hardware or throttle performance.
+2. VPN health check before every remote command.
+3. Keep SSH/session state reproducible with explicit options and saved notes,
+   but do not publish private keys, passwords, tokens, or env files.
 4. All long commands wrapped with progress output
 5. Try top 5000 passwords first — most HTB passwords are common
