@@ -1,0 +1,9 @@
+# Local artifacts that must never be committed
+*.ovpn
+*.pcap
+loot/
+*.key
+id_rsa
+id_ed25519
+*_key
+.env
