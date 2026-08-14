@@ -3,7 +3,7 @@
 | Info | Detail |
 |------|--------|
 | OS | Linux (Ubuntu, OpenSSH 8.2p1 Ubuntu 4ubuntu0.2) |
-| Difficulty | Easy |
+| Difficulty | Medium |
 | IP | 10.129.86.147 → 10.129.86.228 (box reset mid-engagement) |
 | Date | 2026-08-13 |
 | Status | ✅ Rooted |
@@ -130,6 +130,7 @@ python3.8 -c 'import os; os.setuid(0); os.system("id; cat /root/root.txt")'
 | External IP | `10.129.244.214` |
 | Date | 2026-08-14 |
 | Status | ✅ Rooted |
+| Difficulty | Medium |
 | Initial surface | `22/tcp` SSH, `443/tcp` HTTPS |
 
 ## Attack Chain — Langflow to Kubernetes Host Mount

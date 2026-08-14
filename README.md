@@ -13,7 +13,7 @@ resume or review a box later without relying on memory.
 | [Pirate](machines/Pirate/) | Windows | Hard | 2026-03-02 | ✅ Completed |
 | [Facts](machines/Facts/) | Linux | Medium | 2026-03-09 | ✅ Completed |
 | [WingData](machines/WingData/) | Linux | Easy | 2026-04-09 | ✅ Completed |
-| [Fireflow](machines/Fireflow/) | Linux | Easy | 2026-08-13 / 2026-08-14 | ✅ Completed |
+| [Fireflow](machines/Fireflow/) | Linux | Medium | 2026-08-13 / 2026-08-14 | ✅ Completed |
 | [Garfield](machines/Garfield/) | Windows | TBD | 2026-04-08 | 🔄 In Progress |
 
 ## Current Operator
